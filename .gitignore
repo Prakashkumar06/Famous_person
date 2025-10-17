@@ -1,0 +1,4 @@
+venv/
+.env
+Famous_Figure_Recognition_and_Generative_Q_A_Engine.egg-info
+gcp-key.json
