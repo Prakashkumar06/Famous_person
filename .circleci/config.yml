@@ -52,6 +52,24 @@ jobs:
               kubectl apply -f kubernetes-deployment.yaml --validate=false
               kubectl rollout restart deployment llmops-app
 
+  run_playwright_tests:
+    executor: docker-executor
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            npm install
+      - run:
+          name: Run Playwright tests
+          command: |
+            mkdir test-results
+            pnpm run serve &
+            TESTFILES=$(circleci tests glob "specs/e2e/**/*.spec.ts")
+            echo "$TESTFILES" | circleci tests run --command="xargs pnpm playwright test --config=playwright.config.ci.ts --reporter=junit" --verbose --split-by=timings
+      - store_test_results:
+          path: test-results
+
 workflows:
   version: 2
   deploy_pipeline:
@@ -63,9 +81,6 @@ workflows:
       - deploy_to_gke:
           requires:
             - build_docker_image
-
-    
-
-
-
-
+      - run_playwright_tests:
+          requires:
+            - deploy_to_gke
