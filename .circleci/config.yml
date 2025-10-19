@@ -22,10 +22,15 @@ jobs:
           command: |
               echo "$GCLOUD_SERVICE_KEY" | base64 --decode > gcp-key.json
               gcloud auth activate-service-account --key-file=gcp-key.json
-              gcloud auth configure-docker us-central1-docker.pkg.dev || gcloud auth configure-docker
+              gcloud auth configure-docker us-central1-docker.pkg.dev 
 
       - run:
-          name: Build and Push Image
+          name: Set Google Project ID
+          command: |
+            export GOOGLE_PROJECT_ID=music-472706
+
+      - run:
+          name: Build and Push Docker Image
           command: |
               docker build -t us-central1-docker.pkg.dev/$GOOGLE_PROJECT_ID/llmops-repo/llmops-app:latest .
               docker push us-central1-docker.pkg.dev/$GOOGLE_PROJECT_ID/llmops-repo/llmops-app:latest
