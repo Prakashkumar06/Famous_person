@@ -23,6 +23,8 @@ spec:
             secretKeyRef:
               name: llmops-secrets
               key: GROQ_API_KEY
+      imagePullSecrets:
+      - name: gcp-docker-secret  # <- This tells Kubernetes to use the secret to authenticate
 
 ---
 
