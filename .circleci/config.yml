@@ -7,55 +7,64 @@ executors:
     working_directory: ~/repo
 
 jobs:
+  # Step 1: Checkout Code
   checkout_code:
     executor: docker-executor
     steps:
       - checkout
 
+  # Step 2: Build & Push Docker Image
   build_docker_image:
     executor: docker-executor
     steps:
       - checkout
-      - setup_remote_docker
+      - setup_remote_docker:
+          version: 20.10.17
+          docker_layer_caching: true
       - run:
-          name: Authenticate with google cloud
+          name: Authenticate & Build Docker Image
           command: |
-              echo "$GCLOUD_SERVICE_KEY" | base64 --decode > gcp-key.json
-              gcloud auth activate-service-account --key-file=gcp-key.json
-              gcloud auth configure-docker us-central1-docker.pkg.dev 
+            # Decode and activate Google Cloud service account
+            echo "$GCLOUD_SERVICE_KEY" | base64 --decode > gcp-key.json
+            gcloud auth activate-service-account --key-file=gcp-key.json
 
-      - run:
-          name: Set Google Project ID
-          command: |
+            # Configure Docker for Google Artifact Registry
+            gcloud auth configure-docker us-central1-docker.pkg.dev
+
+            # Set Google Project ID
             export GOOGLE_PROJECT_ID=music-472706
 
-      - run:
-          name: Build and Push Docker Image
-          command: |
-              docker build -t us-central1-docker.pkg.dev/$GOOGLE_PROJECT_ID/llmops-repo/llmops-app:latest .
-              docker push us-central1-docker.pkg.dev/$GOOGLE_PROJECT_ID/llmops-repo/llmops-app:latest
+            # Build Docker image
+            docker build -t us-central1-docker.pkg.dev/$GOOGLE_PROJECT_ID/llmops-repo/llmops-app:latest .
 
+            # Push Docker image
+            docker push us-central1-docker.pkg.dev/$GOOGLE_PROJECT_ID/llmops-repo/llmops-app:latest
+
+  # Step 3: Deploy to GKE
   deploy_to_gke:
     executor: docker-executor
     steps:
       - checkout
-      - setup_remote_docker
+      - setup_remote_docker:
+          version: 20.10.17
+          docker_layer_caching: true
       - run:
-          name: Authenticate with google cloud
+          name: Authenticate with Google Cloud
           command: |
-              echo "$GCLOUD_SERVICE_KEY" | base64 --decode > gcp-key.json
-              gcloud auth activate-service-account --key-file=gcp-key.json
-              gcloud auth configure-docker us-central1-docker.pkg.dev || gcloud auth configure-docker
-      
+            echo "$GCLOUD_SERVICE_KEY" | base64 --decode > gcp-key.json
+            gcloud auth activate-service-account --key-file=gcp-key.json
+            gcloud auth configure-docker us-central1-docker.pkg.dev
+
       - run:
           name: Configure GKE
           command: |
-              gcloud container clusters get-credentials $GKE_CLUSTER --region $GOOGLE_COMPUTE_REGION --project $GOOGLE_PROJECT_ID
+            gcloud container clusters get-credentials $GKE_CLUSTER --region $GOOGLE_COMPUTE_REGION --project $GOOGLE_PROJECT_ID
+
       - run:
           name: Deploy to GKE
           command: |
-              kubectl apply -f kubernetes-deployment.yaml --validate=false
-              kubectl rollout restart deployment llmops-app
+            kubectl apply -f kubernetes-deployment.yaml --validate=false
+            kubectl rollout restart deployment llmops-app
 
 workflows:
   version: 2
@@ -68,9 +77,4 @@ workflows:
       - deploy_to_gke:
           requires:
             - build_docker_image
-
-    
-
-
-
-
+            
